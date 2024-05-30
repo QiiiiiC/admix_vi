@@ -5,7 +5,7 @@ import topology
 from simulation import all_ibd_segments, popn3_simple_data
 import torch
 
-#nodes.keys() is not ordered by nominal values, so map to some indeices.
+#nodes.keys() is not ordered by nominal values, so map to some indices.
 def create_nodes_map(nodes):
     nodes_map = {}
     it = 0
