@@ -34,20 +34,23 @@ def all_ibd_segments(ts):
 # N and T are list of variables specify the parameters in population topology.
 # Topology is fixed under this simulation.
 
-def popn3_simple_data(N,T,L,B):
+def popn3_simple_data_morgan(N,T,L,B,m,length):
     demography = msprime.Demography()
     demography.add_population(name="A", initial_size=N[0])
     demography.add_population(name="B", initial_size=N[1])
     demography.add_population(name="C", initial_size=N[2])
-    demography.add_population(name="AB", initial_size=N[3])
+    demography.add_population(name="BC", initial_size=N[3])
     demography.add_population(name="ABC", initial_size=N[4])
-    demography.add_population_split(time=T[0], derived=["A", "B"], ancestral="AB")
-    demography.add_population_split(time=T[1], derived=["AB", "C"], ancestral="ABC")
+    demography.add_population_split(time=T[0], derived=["B", "C"], ancestral="BC")
+    demography.add_population_split(time=T[1], derived=["A", "BC"], ancestral="ABC")
+    
+    bb = m*length
+    kk = m*100
     ts = msprime.sim_ancestry(
         samples={"A": 5, "B": 5, "C": 5}, 
         demography=demography, 
-        recombination_rate = 1e-6,
-        sequence_length = 1e6
+        recombination_rate = 1/length,
+        sequence_length = bb
     )
     all = all_ibd_segments(ts)
     out = [np.zeros((3,3)) for i in range(len(L)-1)]
@@ -59,7 +62,7 @@ def popn3_simple_data(N,T,L,B):
         o = []
         for j in range(10):
             for k in range(j+1,10):
-                a = [l for l in all[j][k] if u<l*100<v]
+                a = [l for l in all[j][k] if u<l*kk<v]
                 o.append(sum(a))
         out[i][0][0] = sum(o)/len(o)
         oo = []
@@ -71,7 +74,7 @@ def popn3_simple_data(N,T,L,B):
         o = []
         for j in range(10):
             for k in range(j+10,20):
-                a = [l for l in all[j][k] if u<l*100<v]
+                a = [l for l in all[j][k] if u<l*kk<v]
                 o.append(sum(a))
         out[i][0][1] = out[i][1][0] = sum(o)/len(o)
         oo = []
@@ -84,7 +87,7 @@ def popn3_simple_data(N,T,L,B):
         o = []
         for j in range(10):
             for k in range(j+20,30):
-                a = [l for l in all[j][k] if u<l*100<v]
+                a = [l for l in all[j][k] if u<l*kk<v]
                 o.append(sum(a))
         out[i][0][2] = out[i][2][0] = sum(o)/len(o)
         oo = []
@@ -97,7 +100,7 @@ def popn3_simple_data(N,T,L,B):
         o = []
         for j in range(10,20):
             for k in range(j+1,20):
-                o.append(sum([l for l in all[j][k] if u<l*100<v]))
+                o.append(sum([l for l in all[j][k] if u<l*kk<v]))
         out[i][1][1] = sum(o)/len(o)
         oo = []
         for b in range(B):
@@ -109,7 +112,7 @@ def popn3_simple_data(N,T,L,B):
         o = []
         for j in range(10,20):
             for k in range(j+10,30):
-                a = [l for l in all[j][k] if u<l*100<v]
+                a = [l for l in all[j][k] if u<l*kk<v]
                 o.append(sum(a))
         out[i][1][2] = out[i][2][1] = sum(o)/len(o)
         oo = []
@@ -122,7 +125,7 @@ def popn3_simple_data(N,T,L,B):
         o = []
         for j in range(20,30):
             for k in range(j+1,30):
-                a = [l for l in all[j][k] if u<l*100<v]
+                a = [l for l in all[j][k] if u<l*kk<v]
                 o.append(sum(a))
         out[i][2][2] = sum(o)/len(o)
         oo = []
@@ -136,3 +139,106 @@ def popn3_simple_data(N,T,L,B):
 
 
 
+
+def popn3_simple_data_recombination(N,T,L,B,rho):
+    demography = msprime.Demography()
+    demography.add_population(name="A", initial_size=N[0])
+    demography.add_population(name="B", initial_size=N[1])
+    demography.add_population(name="C", initial_size=N[2])
+    demography.add_population(name="BC", initial_size=N[3])
+    demography.add_population(name="ABC", initial_size=N[4])
+    demography.add_population_split(time=T[0], derived=["B", "C"], ancestral="BC")
+    demography.add_population_split(time=T[1], derived=["A", "BC"], ancestral="ABC")
+    
+    m=2
+    kk=200
+    ts = msprime.sim_ancestry(
+        samples={"A": 5, "B": 5, "C": 5}, 
+        demography=demography, 
+        recombination_rate = rho,
+        sequence_length = round(m/rho)
+    )
+    all = all_ibd_segments(ts)
+    out = [np.zeros((3,3)) for i in range(len(L)-1)]
+    boot_var = [np.zeros((3,3)) for i in range(len(L)-1)]
+    for i in range(len(L)-1):
+        u = L[i]
+        v = L[i+1]
+
+        o = []
+        for j in range(10):
+            for k in range(j+1,10):
+                a = [l for l in all[j][k] if u<l*kk<v]
+                o.append(sum(a))
+        out[i][0][0] = sum(o)/len(o)
+        oo = []
+        for b in range(B):
+            p = random.choices(o, k=len(o))
+            oo.append(sum(p)/len(p))
+        boot_var[i][0][0] = sum((x - sum(oo)/len(oo)) ** 2 for x in oo)/len(oo)
+
+        o = []
+        for j in range(10):
+            for k in range(j+10,20):
+                a = [l for l in all[j][k] if u<l*kk<v]
+                o.append(sum(a))
+        out[i][0][1] = out[i][1][0] = sum(o)/len(o)
+        oo = []
+        for b in range(B):
+            p = random.choices(o, k=len(o))
+            oo.append(sum(p)/len(p))
+        boot_var[i][0][1] = boot_var[i][1][0] = sum((x - sum(oo)/len(oo)) ** 2 for x in oo)/len(oo)
+
+
+        o = []
+        for j in range(10):
+            for k in range(j+20,30):
+                a = [l for l in all[j][k] if u<l*kk<v]
+                o.append(sum(a))
+        out[i][0][2] = out[i][2][0] = sum(o)/len(o)
+        oo = []
+        for b in range(B):
+            p = random.choices(o, k=len(o))
+            oo.append(sum(p)/len(p))
+        boot_var[i][0][2] = boot_var[i][2][0] = sum((x - sum(oo)/len(oo)) ** 2 for x in oo)/len(oo)
+
+
+        o = []
+        for j in range(10,20):
+            for k in range(j+1,20):
+                o.append(sum([l for l in all[j][k] if u<l*kk<v]))
+        out[i][1][1] = sum(o)/len(o)
+        oo = []
+        for b in range(B):
+            p = random.choices(o, k=len(o))
+            oo.append(sum(p)/len(p))
+        boot_var[i][1][1] = sum((x - sum(oo)/len(oo)) ** 2 for x in oo)/len(oo)
+
+
+        o = []
+        for j in range(10,20):
+            for k in range(j+10,30):
+                a = [l for l in all[j][k] if u<l*kk<v]
+                o.append(sum(a))
+        out[i][1][2] = out[i][2][1] = sum(o)/len(o)
+        oo = []
+        for b in range(B):
+            p = random.choices(o, k=len(o))
+            oo.append(sum(p)/len(p))
+        boot_var[i][1][2] = boot_var[i][2][1] = sum((x - sum(oo)/len(oo)) ** 2 for x in oo)/len(oo)
+
+
+        o = []
+        for j in range(20,30):
+            for k in range(j+1,30):
+                a = [l for l in all[j][k] if u<l*kk<v]
+                o.append(sum(a))
+        out[i][2][2] = sum(o)/len(o)
+        oo = []
+        for b in range(B):
+            p = random.choices(o, k=len(o))
+            oo.append(sum(p)/len(p))
+        boot_var[i][2][2] = sum((x - sum(oo)/len(oo)) ** 2 for x in oo)/len(oo)
+
+
+    return out, boot_var
