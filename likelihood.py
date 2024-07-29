@@ -47,6 +47,14 @@ def mig_matrix(nodes, events, nodes_map):
     return out
 
 def frac_function(N,u,v,t1,t2):
+    k1 = (2*N*v + 50)*50/((N*v + 50)**2) * (math.exp(-(N*v + 50)/(N*50)*t2) - math.exp(-(N*v + 50)/(N*50)*t1))
+    k2 = -(2*N*u + 50)*50/((N*u + 50)**2) * (math.exp(-(N*u + 50)/(N*50)*t2) - math.exp(-(N*u + 50)/(N*50)*t1))
+    k3 = v/(N*v + 50)*(t2*math.exp(-(N*v + 50)/(50*N)*t2) - t1*math.exp(-(N*v + 50)/(50*N)*t1))
+    k4 = -u/(N*u + 50)*(t2*math.exp(-(N*u + 50)/(50*N)*t2)-t1*math.exp(-(N*u + 50)/(50*N)*t1))
+    r = math.exp(t1/N)
+    return r*(k1 + k2 + k3 + k4)
+
+def frac_function_pm(N,u,v,t1,t2):
     k1 = (2*N*v + 50)*50/((N*v + 50)**2) * (pm.math.exp(-(N*v + 50)/(N*50)*t2) - pm.math.exp(-(N*v + 50)/(N*50)*t1))
     k2 = -(2*N*u + 50)*50/((N*u + 50)**2) * (pm.math.exp(-(N*u + 50)/(N*50)*t2) - pm.math.exp(-(N*u + 50)/(N*50)*t1))
     k3 = v/(N*v + 50)*(t2*pm.math.exp(-(N*v + 50)/(50*N)*t2) - t1*pm.math.exp(-(N*v + 50)/(50*N)*t1))
@@ -85,38 +93,13 @@ def expected_ratio(N, d, T, nodes, events, u, v):
                 out[k, j] = out[j, k]
 
                 # weight updated
-                ff = np.array([(1-(pm.math.exp(-(T[i+1]-T[i]) / N[j]))) for j in range(len(N))], dtype=np.float64)
+                ff = np.array([(1-(math.exp(-(T[i+1]-T[i]) / N[j]))) for j in range(len(N))], dtype=np.float64)
                 gj = np.dot(prob, ff)
                 weight[j, k] -= gj * weight[j, k]
                 weight[k, j] = weight[j, k]
     return out
 
-def expected_ratio_np(N, d, T, nodes, events, u, v, l):
-    A = mig_matrix(nodes, events,create_nodes_map(nodes))
-    out = [[0 for i in range(d)] for i in range(d)]
-    weight = [[1 for i in range(d)] for i in range(d)]
-    #the ith row of dist is the probability distribution of any individual initially from population i.
-    dist = np.identity(len(A[0]))
 
-    for i in range(len(A)):
-        dist = np.matmul(dist,A[i])
-        for j in range(d):
-            for k in range(j,d):
-                #this is the probability distribution of popn i and popn j lie in one branch.
-                prob = np.multiply(dist[j,:],dist[k,:])
-                
-                #expected fractions updated
-                fun = [frac_function(N[j],u,v,T[i]) for j in range(len(N))]
-                out[j][k] += weight[j][k] * np.matmul(prob.T,fun)
-                out[k][j] = out[j][k]
-
-                #weight updated
-                ff = [(1-math.exp(-T[i]/N[j])) for j in range(len(N))]
-                gj = np.matmul(prob.T,ff)
-                weight[j][k] -= gj*weight[j][k]
-                weight[k][j] = weight[j][k]
-
-    return out
 
 
 
