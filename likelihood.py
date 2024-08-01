@@ -4,7 +4,7 @@ import math
 import topology
 import torch
 import pymc as pm
-import pytensor as pt
+import pytensor.tensor as pt
 
 #nodes.keys() is not ordered by nominal values, so map to some indeices.
 def create_nodes_map(nodes):
@@ -101,61 +101,35 @@ def expected_ratio(N, d, T, nodes, events, u, v):
 
 
 
-def expected_ratio_new(N, d, T, nodes, events, u, v):
-    A = mig_matrix(nodes, events, create_nodes_map(nodes))
-    out = np.zeros((d, d), dtype=np.float64)
-    weight = np.ones((d, d), dtype=np.float64)
-    
-    # the ith row of dist is the probability distribution of any individual initially from population i.
-    dist = np.eye(len(A[0]), dtype=np.float64)
-    T.append(10000000)
-    
-    for i in range(len(A)):
-        dist = np.matmul(dist, np.array(A[i], dtype=np.float64))
-        for j in range(d):
-            for k in range(j, d):
-                # this is the probability distribution of popn i and popn j lie in one branch.
-                prob = dist[j, :] * dist[k, :]
-                
-                # expected fractions updated
-                fun = np.array([frac_function_pm(N[j], u, v,T[i], T[i+1]) for j in range(len(N))], dtype=np.float64)
-                out[j, k] += weight[j, k] * np.dot(prob, fun)
-                out[k, j] = out[j, k]
-
-                # weight updated
-                ff = np.array([(1-(pm.math.exp(-(T[i+1]-T[i]) / N[j]))) for j in range(len(N))], dtype=np.float64)
-                gj = np.dot(prob, ff)
-                weight[j, k] -= gj * weight[j, k]
-                weight[k, j] = weight[j, k]
-    return out
-
-
 
 
 def expected_ratio_tensor(N, d, T, nodes, events, u, v):
     A = mig_matrix(nodes, events, create_nodes_map(nodes))
-    out = pm.math.zeros((d, d))  # Use pm.math.zeros
-    weight = pm.math.ones((d, d))  # Use pm.math.ones
+    out = pm.math.zeros((d, d))  
+    weight = pm.math.ones((d, d))  
     
     # the ith row of dist is the probability distribution of any individual initially from population i.
-    dist = np.eye(len(A[0]), dtype=np.float64)
+    dist = pt.eye(len(A[0]))
     T.append(10000000)
     
     for i in range(len(A)):
-        dist = np.matmul(dist, np.array(A[i], dtype=np.float64))
+        dist = pt.dot(dist, pt.as_tensor_variable(A[i]))
         for j in range(d):
             for k in range(j, d):
                 # this is the probability distribution of popn i and popn j lie in one branch.
                 prob = dist[j, :] * dist[k, :]
                 
                 # expected fractions updated
-                fun = pm.math.stack([frac_function(N[j], u, v, T[i], T[i+1]) for j in range(len(N))])
-                out = pm.math.set_subtensor(out[j, k], out[j, k] + weight[j, k] * pm.math.dot(prob, fun))
-                out = pm.math.set_subtensor(out[k, j], out[j, k])
+                fun = pt.as_tensor_variable([frac_function_pm(N[j], u, v,T[i], T[i+1]) for j in range(len(N))])
+                out = pt.set_subtensor(out[j, k], out[j, k] + weight[j, k] * pt.dot(prob, fun))
+                out = pt.set_subtensor(out[k, j], out[j, k])
 
                 # weight updated
-                ff = pm.math.stack([(1 - pm.math.exp(-(T[i+1] - T[i]) / N[j])) for j in range(len(N))])
-                gj = pm.math.dot(prob, ff)
-                weight = pm.math.set_subtensor(weight[j, k], weight[j, k] - gj * weight[j, k])
-                weight = pm.math.set_subtensor(weight[k, j], weight[j, k])
+                ff = pt.as_tensor_variable([(1-(pm.math.exp(-(T[i+1]-T[i]) / N[j]))) for j in range(len(N))])
+                gj = pt.dot(prob, ff)
+                weight = pt.set_subtensor(weight[j, k], weight[j, k] - gj * weight[j, k])
+                out = pt.set_subtensor(out[k, j], out[j, k])
     return out
+
+
+def expected_ratio_torch(N, d, T, nodes, events, u, v):
